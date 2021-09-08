@@ -1,161 +1,269 @@
-const { Client } = require('pg') 
+const { Client } = require('pg') // imports the pg module
 
 const client = new Client('postgres://localhost:5432/juicebox-dev');
 
-async function createUser({ username, password, name, location }) {
-    console.log("1",  username, password, name, location )
-    try {
-        const { rows: [ user ] } = await client.query(`
-        INSERT INTO users(username, password, name, location) 
-        VALUES($1, $2, $3, $4) 
-        ON CONFLICT (username) DO NOTHING 
-        RETURNING *;
-        `, [username, password, name, location]);
+/**
+ * USER Methods
+ */
 
-        return user;
-    } catch (error) {
-        throw error;
-    }
-}
+async function createUser({ 
+  username, 
+  password,
+  name,
+  location
+}) {
+  try {
+    const { rows: [ user ] } = await client.query(`
+      INSERT INTO users(username, password, name, location) 
+      VALUES($1, $2, $3, $4) 
+      ON CONFLICT (username) DO NOTHING 
+      RETURNING *;
+    `, [username, password, name, location]);
 
-async function createPost({ authorId, title, content, tags=[] }) {
-    try {
-        const { rows: [ post ] } = await client.query(`
-        INSERT INTO posts("authorId", title, content)
-        VALUES($1, $2, $3)
-        
-        RETURNING *;
-        `, [authorId, title, content])
-
-        return post;
-    } catch (error) {
-        console.log("error creating a post")
-      throw error;
-    }
+    return user;
+  } catch (error) {
+    throw error;
   }
-
-async function getAllUsers() {
-    try {
-        const { rows } = await client.query(`SELECT id, username, name, location, active FROM users;`);
-        return rows;
-    } catch(error){
-        console.log("error getting all users")
-        throw error;
-    }
 }
 
 async function updateUser(id, fields = {}) {
-    // build the set string
-    const setString = Object.keys(fields).map(
-      (key, index) => `"${ key }"=$${ index + 1 }`
-    ).join(', ');
-  
-    // return early if this is called without fields
-    if (setString.length === 0) {
-      return;
-    }
-  
-    try {
-      const { rows: [ user ] } = await client.query(`
-        UPDATE users
-        SET ${ setString }
-        WHERE id=${ id }
-        RETURNING *;
-      `, Object.values(fields));
-     
-  
-      return user;
-    } catch (error) {
-      throw error;
-    }
+  // build the set string
+  const setString = Object.keys(fields).map(
+    (key, index) => `"${ key }"=$${ index + 1 }`
+  ).join(', ');
+
+  // return early if this is called without fields
+  if (setString.length === 0) {
+    return;
   }
 
-async function updatePost(id, fields={ title,content,active }) { //FINISH THIS, MIMIC updateUser
-    const setString = Object.keys(fields).map(
-        (key, index) => `"${ key }"=$${ index + 1 }`
-      ).join(', ');
+  try {
+    const { rows: [ user ] } = await client.query(`
+      UPDATE users
+      SET ${ setString }
+      WHERE id=${ id }
+      RETURNING *;
+    `, Object.values(fields));
 
-    try {
-        const { rows: [ post ] } = await client.query(`
-        UPDATE posts
-        SET ${ setString }
-        WHERE id=${id}
-        RETURNING *;
-        `, Object.values(fields))
-        return post;
-        
-    } catch (error) {
-        throw error;
-    }
+    return user;
+  } catch (error) {
+    throw error;
+  }
 }
 
-async function getAllPosts() {
-    try {
-        const { rows } = await client.query(`SELECT id, "authorId", title, content, active FROM posts;`)
-        return rows;
-    } catch (error) {
-      throw error;
-    }
+async function getAllUsers() {
+  try {
+    const { rows } = await client.query(`
+      SELECT id, username, name, location, active 
+      FROM users;
+    `);
+
+    return rows;
+  } catch (error) {
+    throw error;
   }
-
-async function getPostsByUser(userId) {
-    try {
-        const { rows } = await client.query(`
-        SELECT * FROM posts
-        WHERE "authorId"=${ userId };
-        `);
-
-        return rows;
-    } catch (error) {
-        throw error;
-    }
 }
 
 async function getUserById(userId) {
-    // first get the user (NOTE: Remember the query returns 
-      // (1) an object that contains 
-      // (2) a `rows` array that (in this case) will contain 
-      // (3) one object, which is our user.
-    // if it doesn't exist (if there are no `rows` or `rows.length`), return null
-  
-    // if it does:
-    // delete the 'password' key from the returned object
-    // get their posts (use getPostsByUser)
-    // then add the posts to the user object with key 'posts'
-    // return the user object
-    
-    try {
-        const { rows: [ user ] } = await client.query(`
-        SELECT * FROM posts
-        WHERE "authorId"=${ userId };
-        `);
-        if (rows.length === 0) {
-            return null;
-        } else {
-            
-            client.query(`
-            DELETE FROM users WHERE ${user.password}="password"
-            INSERT INTO ${user.posts} 
-            VALUES (${getPostsByUser()})
-            RETURNING ${user};
-            `)
-        }
+  try {
+    const { rows: [ user ] } = await client.query(`
+      SELECT id, username, name, location, active
+      FROM users
+      WHERE id=${ userId }
+    `);
 
-        return user;
-
-    } catch (error) {
-        throw error;
+    if (!user) {
+      return null
     }
+
+    user.posts = await getPostsByUser(userId);
+
+    return user;
+  } catch (error) {
+    throw error;
   }
+}
+
+/**
+ * POST Methods
+ */
+
+async function createPost({
+  authorId,
+  title,
+  content
+}) {
+  try {
+    const { rows: [ post ] } = await client.query(`
+      INSERT INTO posts("authorId", title, content) 
+      VALUES($1, $2, $3)
+      RETURNING *;
+    `, [authorId, title, content]);
+
+    return post;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function updatePost(id, fields = {}) {
+  // build the set string
+  const setString = Object.keys(fields).map(
+    (key, index) => `"${ key }"=$${ index + 1 }`
+  ).join(', ');
+
+  // return early if this is called without fields
+  if (setString.length === 0) {
+    return;
+  }
+
+  try {
+    const { rows: [ post ] } = await client.query(`
+      UPDATE posts
+      SET ${ setString }
+      WHERE id=${ id }
+      RETURNING *;
+    `, Object.values(fields));
+
+    return post;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function getAllPosts() {
+  try {
+    const { rows } = await client.query(`
+      SELECT *
+      FROM posts;
+    `);
+
+    return rows;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function getPostsByUser(userId) {
+  try {
+    const { rows } = await client.query(`
+      SELECT * 
+      FROM posts
+      WHERE "authorId"=${ userId };
+    `);
+
+    return rows;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function createTags(tagList) {   //CHECK THIS
+  if (tagList.length === 0) { 
+    return; 
+  }
+      await client.query(`
+        INSERT INTO tags(name) 
+        VALUES($1, $2, $3)
+        ON CONFLICT (name) DO NOTHING;
+      `, );
+ 
+  const insertValues = tagList.map(
+    (key, index) => `"${key}""=$${index + 1}`).join('), (');
+
+  const selectValues = tagList.map(
+    (key, index) => `"${key}""=$${index + 1}`).join('), (');
+
+  try {
+
+    const { rows } = await client.query(`
+    INSERT INTO tags(name)
+    VALUES ($1=${insertValues}), ($2=${insertValues}), ($3=${insertValues})
+    ON CONFLICT (name) DO NOTHING
+
+    SELECT * FROM tags
+    WHERE name
+    IN ($1=${selectValues}), ($2=${selectValues}), ($3=${selectValues});
+  `, Object.values(fields));
+
+  return rows;
+    
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function createPostTag(postId, tagId) {
+  try {
+    await client.query(`
+      INSERT INTO post_tags("postId", "tagId")
+      VALUES ($1, $2)
+      ON CONFLICT ("postId", "tagId") DO NOTHING;
+    `, [postId, tagId]);
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+async function addTagsToPost(postId, tagList) {
+  try {
+    const createPostTagPromises = tagList.map(
+      tag => createPostTag(postId, tag.id)
+    );
+
+    await Promise.all(createPostTagPromises);
+
+    return await getPostById(postId);
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function getPostById(postId) {
+  try {
+    const { rows: [ post ]  } = await client.query(`
+      SELECT *
+      FROM posts
+      WHERE id=$1;
+    `, [postId]);
+
+    const { rows: tags } = await client.query(`
+      SELECT tags.*
+      FROM tags
+      JOIN post_tags ON tags.id=post_tags."tagId"
+      WHERE post_tags."postId"=$1;
+    `, [postId])
+
+    const { rows: [author] } = await client.query(`
+      SELECT id, username, name, location
+      FROM users
+      WHERE id=$1;
+    `, [post.authorId])
+
+    post.tags = tags;
+    post.author = author;
+
+    delete post.authorId;
+
+    return post;
+  } catch (error) {
+    throw error;
+  }
+}
 
 module.exports = {  
   client,
   createUser,
-  getAllUsers,
   updateUser,
+  getAllUsers,
+  getUserById,
   createPost,
   updatePost,
   getAllPosts,
   getPostsByUser,
-  getUserById
+  createTags,
+  createPostTag,
+  addTagsToPost,
+  getPostById
 }
