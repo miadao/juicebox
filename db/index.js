@@ -1,5 +1,4 @@
 const { Client } = require('pg') // imports the pg module
-
 const client = new Client('postgres://localhost:5432/juicebox-dev');
 
 /**
@@ -126,20 +125,18 @@ async function createTags(tagList) {
     
   try {
     
-
     await client.query(`
     INSERT INTO tags(name)
     VALUES(${insertValues})
     ON CONFLICT (name) DO NOTHING;
     `,tagList);
-    console.log(insertValues)
+    
     const { rows } = await client.query(`
     SELECT * FROM tags
     WHERE name
     IN (${selectValues});
     `,tagList);
 
-    console.log("1")
     return rows;
     
   } catch (error) {
