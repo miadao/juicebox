@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const morgan = require('morgan');
 const bodyParser = require('body-parser');
@@ -18,6 +19,7 @@ server.use((req, res, next) => {
   
     next();
   });
+
 
 const { client } = require('./db');
 client.connect();
