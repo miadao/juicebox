@@ -172,13 +172,19 @@ async function createPostTag(postId, tagId) {
 
 
 async function getPostById(postId) {
-  
   try {
     const { rows: [ post ]  } = await client.query(`
       SELECT *
       FROM posts
       WHERE id=$1;
     `, [postId]);
+
+    if (!post) {
+      throw {
+        name: "PostNotFoundError",
+        message: "Could not find a post with that postId"
+      };
+    }
 
     const { rows: tags } = await client.query(`
       SELECT tags.*
@@ -197,12 +203,11 @@ async function getPostById(postId) {
     post.author = author;
 
     delete post.authorId;
-    
+
     return post;
   } catch (error) {
     throw error;
   }
-  
 }
 
 

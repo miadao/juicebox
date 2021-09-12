@@ -11,7 +11,7 @@ const { JWT_SECRET } = process.env;
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/posts', postsRouter );
 apiRouter.use('/tags', tagsRouter );
-apiRouter.use('/login', tagsRouter );
+
 
 apiRouter.use(async (req, res, next) => {
     const prefix = 'Bearer ';
@@ -40,12 +40,12 @@ apiRouter.use(async (req, res, next) => {
     }
   });
 
-  apiRouter.use((req, res, next) => {
-    if (req.user) {
-      console.log("User is set:", req.user);
-    }
-    next();
-  });
+apiRouter.use((req, res, next) => {
+  if (req.user) {
+    console.log("User is set:", req.user);
+  }
+  next();
+});
   
 server.use(async (req, res, next) => {
     const prefix = 'Bearer '
